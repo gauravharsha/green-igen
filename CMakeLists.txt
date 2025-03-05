@@ -28,7 +28,7 @@ elseif (APPLE)
 else ()
   set(CMAKE_SKIP_BUILD_RPATH  True)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH True)
-  set(CMAKE_INSTALL_RPATH "\$ORIGIN:\$ORIGIN/deps/lib:\$ORIGIN/deps/lib64:\$ORIGIN/green_igen")
+  set(CMAKE_INSTALL_RPATH "\$ORIGIN:\$ORIGIN/green_igen")
   set(INSTALL_RPATH_USE_LINK_PATH 1)
 endif ()
 
@@ -109,7 +109,6 @@ set(CMAKE_C_CREATE_SHARED_LIBRARY ${libcint_CMAKE_C_CREATE_SHARED_LIBRARY})
 
 add_subdirectory(src)
 add_library(GREEN::IGEN ALIAS pbc0)
-target_link_directories(pbc0 PRIVATE ${libcint_BINARY_DIR})
 add_dependencies(pbc0 cint)
 
 target_include_directories(pbc0 PUBLIC "${cint_BINARY_DIR}/include")
@@ -117,5 +116,4 @@ target_include_directories(pbc0 PUBLIC "${cint_SOURCE_DIR}/include")
 
 message(STATUS ${CMAKE_INSTALL_PREFIX})
 install(TARGETS pbc0 DESTINATION green_igen)
-INSTALL(TARGETS cint EXPORT cint LIBRARY DESTINATION green_igen COMPONENT runtime NAMELINK_SKIP)
 

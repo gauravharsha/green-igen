@@ -24,6 +24,7 @@ add_library(pbc0 SHARED ft_ao.c fill_ints.c optimizer.c grid_ao.c nr_direct.c
   time_rev.c r_direct_o1.c rkb_screen.c
   r_direct_dot.c rah_direct_dot.c rha_direct_dot.c
   hessian_screen.c nr_sgx_direct.c transpose.c pack_tril.c npdot.c condense.c omp_reduce.c np_helper.c
+  $<TARGET_OBJECTS:cint>
   )
 
 target_include_directories(pbc0 PUBLIC "${PROJECT_SOURCE_DIR}/src")
@@ -32,11 +33,7 @@ target_include_directories(pbc0 PUBLIC "${PROJECT_BINARY_DIR}/src")
 target_include_directories(pbc0 PUBLIC "${PROJECT_BINARY_DIR}/deps/include")
 
 set_target_properties(pbc0 PROPERTIES
-#  LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}
   COMPILE_FLAGS ${OpenMP_C_FLAGS}
   LINK_FLAGS ${OpenMP_C_FLAGS})
 
-target_link_libraries(pbc0 ${BLAS_LIBRARIES} -lcint)
-target_link_directories(pbc0 PUBLIC ${PROJECT_BINARY_DIR}/deps/lib ${PROJECT_BINARY_DIR}/deps/lib64)
-#target_link_libraries(pbc cgto cint cvhf np_helper ${BLAS_LIBRARIES})
-
+target_link_libraries(pbc0 ${BLAS_LIBRARIES})
