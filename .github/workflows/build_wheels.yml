@@ -26,20 +26,44 @@ jobs:
           CIBW_ENVIRONMENT_MACOS: >
             GMP_DIR=${{ matrix.plat.homebrew }}
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.plat.target }}
-#          CIBW_ENVIRONMENT: >
-
-        # env:
-        #   CIBW_SOME_OPTION: value
-        #    ...
-        # with:
-        #   package-dir: .
-        #   output-dir: wheelhouse
-        #   config-file: "{package}/pyproject.toml"
+          CIBW_ENVIRONMENT_LINUX: >
+            CIBW_MANYLINUX_X86_64_IMAGE=manylinux2014
+            CIBW_BEFORE_ALL_LINUX="sed -i -e 's/mirrorlist/#mirrorlist/g' -e 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*; yum install -y hdf5-devel openblas-devel"
 
       - uses: actions/upload-artifact@v4
         with:
           name: cibw-wheels-${{ matrix.plat.os }}-${{ strategy.job-index }}
           path: ./wheelhouse/*.whl
+
+  build_wheels_13:
+    name: Build wheels on ${{ matrix.plat.os }}
+    runs-on: ${{ matrix.plat.os }}
+    strategy:
+      matrix:
+        # macos-13 is an intel runner, macos-14 is apple silicon
+        plat: 
+        - { os: ubuntu-latest, target: "", arch: x86_64, homebrew: ''}
+        - { os: macos-13, target: "13.0" , arch: x86_64, homebrew: '/usr/local'}
+        - { os: macos-14, target: "14.0" , arch: arm64, homebrew: '/opt/homebrew'}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23.0
+        env:
+          CIBW_BUILD: cp313-*
+          CIBW_ARCHS: ${{ matrix.plat.arch }}
+
+          CIBW_ENVIRONMENT_MACOS: >
+            GMP_DIR=${{ matrix.plat.homebrew }}
+            MACOSX_DEPLOYMENT_TARGET=${{ matrix.plat.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.plat.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+
 
 
   build_sdist:
@@ -58,7 +82,7 @@ jobs:
 
 
   upload_pypi:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, build_wheels_13, build_sdist]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
