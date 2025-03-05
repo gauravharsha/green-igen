@@ -30,17 +30,3 @@ jobs:
         module load BuildEnv/gcc-12.2.0.lua gmp/6.2.1;
         cd build;
         ctest -j4 --output-on-failure
-    - name: Run coverage
-      run: |
-        module load BuildEnv/gcc-12.2.0.lua gmp/6.2.1;
-        cd build;
-        lcov --capture --directory . --output-file coverage.info;
-        lcov --remove coverage.info '/usr/*' --output-file coverage.info
-        lcov --remove coverage.info '/opt/ohpc/pub/compiler/*' --output-file coverage.info
-        lcov --remove coverage.info '*catch*' --output-file coverage.info
-        lcov --list coverage.info
-
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v4
-      env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
