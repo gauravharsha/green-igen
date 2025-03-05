@@ -19,14 +19,14 @@
 import ctypes
 import copy
 import numpy
-#import .
+from .misc import load_library
 from pyscf import gto
 import pyscf.df
 from pyscf.scf import _vhf
 from pyscf.pbc.gto import _pbcintor
 from pyscf.pbc.lib.kpts_helper import is_zero, gamma_point, unique, KPT_DIFF_TOL
 
-libpbc = misc.load_library('libpbc0')
+libpbc = load_library('libpbc0')
 
 def make_auxmol(cell, auxbasis=None):
     '''
