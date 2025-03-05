@@ -30,7 +30,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://green-phys.org"
-Issues = "https://github.com/Green-Phys/green-ac/issues"
+Issues = "https://github.com/Green-Phys/green-igen/issues"
 
 
 [project.optional-dependencies]
