@@ -61,7 +61,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: cibw-wheels-${{ matrix.plat.os }}-${{ strategy.job-index }}
+          name: cibw-wheels-${{ matrix.plat.os }}-${{ strategy.job-index }}-13
           path: ./wheelhouse/*.whl
 
 
