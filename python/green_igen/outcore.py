@@ -23,8 +23,9 @@ from pyscf import gto
 from pyscf.ao2mo.outcore import balance_segs
 from pyscf.pbc.lib.kpts_helper import gamma_point, unique, KPT_DIFF_TOL
 from .incore import wrap_int3c, make_auxcell
+from .misc import load_library
 
-libpbc = lib.load_library('libpbc')
+libpbc = load_library('libpbc0')
 
 
 def aux_e1(cell, auxcell_or_auxbasis, erifile, intor='int3c2e', aosym='s2ij', comp=None,
@@ -163,7 +164,6 @@ def _aux_e2(cell, auxcell_or_auxbasis, erifile, intor='int3c2e', aosym='s2ij', c
         kptij_lst : (*,2,3) array
             A list of (kpti, kptj)
     '''
-    print(auxcell_or_auxbasis)
     #if isinstance(auxcell_or_auxbasis, gto.Mole):
     auxcell = auxcell_or_auxbasis
     #else:
@@ -221,8 +221,8 @@ def _aux_e2(cell, auxcell_or_auxbasis, erifile, intor='int3c2e', aosym='s2ij', c
     auxdims = aux_loc[shls_slice[4]+1:shls_slice[5]+1] - aux_loc[shls_slice[4]:shls_slice[5]]
     auxranges = balance_segs(auxdims, buflen)
     buflen = max([x[2] for x in auxranges])
-    buf = numpy.empty(nkptij*comp*ni*nj*buflen, dtype=dtype)
-    bufs = [buf, numpy.empty_like(buf)]
+    buf = numpy.zeros(nkptij*comp*ni*nj*buflen, dtype=dtype)
+    bufs = [buf, numpy.zeros_like(buf)]
     int3c = wrap_int3c(cell, auxcell, intor, aosym, comp, kptij_lst)
 
     def process(aux_range):

@@ -49,7 +49,6 @@ c_int_p = ctypes.POINTER(ctypes.c_int)
 c_null_ptr = ctypes.POINTER(ctypes.c_void_p)
 
 def load_library(libname):
-    print(f"\n\n\n\n loading {libname} \n\n\n")
     try:
         _loaderpath = os.path.dirname(__file__)
         return numpy.ctypeslib.load_library(libname, _loaderpath)

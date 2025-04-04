@@ -19,8 +19,6 @@
 C extensions and helper functions
 '''
 
-print(f"\n\n\n\n\n IMPORTING ")
-
 from pyscf.lib import parameters
 param = parameters
 from . import numpy_helper

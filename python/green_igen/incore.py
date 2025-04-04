@@ -20,13 +20,80 @@ import ctypes
 import copy
 import numpy
 from .misc import load_library
+from .numpy_helper import cartesian_prod
 from pyscf import gto
 import pyscf.df
-from pyscf.scf import _vhf
-from pyscf.pbc.gto import _pbcintor
+from . import _vhf
+from . import _pbcintor
 from pyscf.pbc.lib.kpts_helper import is_zero, gamma_point, unique, KPT_DIFF_TOL
 
 libpbc = load_library('libpbc0')
+
+def get_lattice_Ls(cell, nimgs=None, rcut=None, dimension=None, discard=True):
+    '''Get the (Cartesian, unitful) lattice translation vectors for nearby images.
+    The translation vectors can be used for the lattice summation.'''
+    a = cell.lattice_vectors()
+    b = cell.reciprocal_vectors(norm_to=1)
+    heights_inv = numpy.linalg.norm(b, axis=1)
+
+    if nimgs is None:
+        if rcut is None:
+            rcut = cell.rcut
+        # For atoms outside the cell, distance between certain basis of nearby
+        # images may be smaller than rcut threshold even the corresponding Ls is
+        # larger than rcut. The boundary penalty ensures that Ls would be able to
+        # cover the basis that sitting out of the cell.
+        # See issue https://github.com/pyscf/pyscf/issues/1017
+        scaled_atom_coords = cell.atom_coords().dot(b.T)
+        boundary_penalty = numpy.max([abs(scaled_atom_coords).max(axis=0),
+                                   abs(1 - scaled_atom_coords).max(axis=0)], axis=0)
+        nimgs = numpy.ceil(rcut * heights_inv + boundary_penalty).astype(int)
+    else:
+        rcut = max((numpy.asarray(nimgs))/heights_inv)
+
+    if dimension is None:
+        dimension = cell.dimension
+    if dimension == 0:
+        nimgs = [0, 0, 0]
+    elif dimension == 1:
+        nimgs = [nimgs[0], 0, 0]
+    elif dimension == 2:
+        nimgs = [nimgs[0], nimgs[1], 0]
+
+    Ts = cartesian_prod((numpy.arange(-nimgs[0], nimgs[0]+1),
+                             numpy.arange(-nimgs[1], nimgs[1]+1),
+                             numpy.arange(-nimgs[2], nimgs[2]+1)))
+    Ls = numpy.dot(Ts, a)
+    if discard:
+        Ls = _discard_edge_images(cell, Ls, rcut)
+    return numpy.asarray(Ls, order='C')
+
+def _discard_edge_images(cell, Ls, rcut):
+    '''
+    Discard images if no basis in the image would contribute to lattice sum.
+    '''
+    if rcut <= 0:
+        return numpy.zeros((1, 3))
+
+    a = cell.lattice_vectors()
+    scaled_atom_coords = numpy.linalg.solve(a.T, cell.atom_coords().T).T
+    atom_boundary_max = scaled_atom_coords.max(axis=0)
+    atom_boundary_min = scaled_atom_coords.min(axis=0)
+    # ovlp_penalty ensures the overlap integrals for atoms in the adjcent
+    # images are converged.
+    ovlp_penalty = atom_boundary_max - atom_boundary_min
+    # atom_boundary_min-1 ensures the values of basis at the grids on the edge
+    # of the primitive cell converged
+    boundary_max = numpy.ceil(numpy.max([atom_boundary_max  ,  ovlp_penalty], axis=0)).astype(int)
+    boundary_min = numpy.floor(numpy.min([atom_boundary_min-1, -ovlp_penalty], axis=0)).astype(int)
+    penalty_x = numpy.arange(boundary_min[0], boundary_max[0]+1)
+    penalty_y = numpy.arange(boundary_min[1], boundary_max[1]+1)
+    penalty_z = numpy.arange(boundary_min[2], boundary_max[2]+1)
+    shifts = cartesian_prod([penalty_x, penalty_y, penalty_z]).dot(a)
+    Ls_mask = (numpy.linalg.norm(Ls + shifts[:,None,:], axis=2) < rcut).any(axis=0)
+    # cell0 (Ls == 0) should always be included.
+    Ls_mask[len(Ls)//2] = True
+    return Ls[Ls_mask]
 
 def make_auxmol(cell, auxbasis=None):
     '''
@@ -134,7 +201,7 @@ def wrap_int3c(cell, auxcell, intor='int3c2e', aosym='s1', comp=1,
     atm, bas, env = gto.conc_env(atm, bas, env,
                                  auxcell._atm, auxcell._bas, auxcell._env)
     rcut = max(cell.rcut, auxcell.rcut)
-    Ls = cell.get_lattice_Ls(rcut=rcut)
+    Ls = get_lattice_Ls(cell, rcut=rcut)
     nimgs = len(Ls)
     nbas = cell.nbas
 

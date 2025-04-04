@@ -43,14 +43,14 @@ from pyscf import gto
 from pyscf.lib import logger
 from pyscf.df import addons
 from pyscf.df.outcore import _guess_shell_ranges
-from pyscf.pbc.gto.cell import _estimate_rcut
+#from pyscf.pbc.gto.cell import _estimate_rcut
 from pyscf.pbc import tools
 from . import outcore
 from pyscf.pbc.df import ft_ao
 from pyscf.pbc.df import aft
 from pyscf.pbc.df import df_jk
 from pyscf.pbc.df import df_ao2mo
-from pyscf.pbc.df.aft import estimate_eta, get_nuc
+from pyscf.pbc.df.aft import get_nuc
 from pyscf.pbc.df.df_jk import zdotCN
 from pyscf.pbc.lib.kpts_helper import (is_zero, gamma_point, member, unique, unique_with_wrap_around,
                                        KPT_DIFF_TOL)
@@ -58,12 +58,56 @@ from pyscf.pbc.df.aft import _sub_df_jk_
 from pyscf import __config__
 
 LINEAR_DEP_THR = getattr(__config__, 'pbc_df_df_DF_lindep', 1e-9)
-ETA_MIN = getattr(__config__, 'pbc_df_aft_estimate_eta_min', 0.1)
+CUTOFF = getattr(__config__, 'pbc_df_aft_estimate_eta_cutoff', 1e-12)
+ETA_MIN = getattr(__config__, 'pbc_df_aft_estimate_eta_min', 0.2)
 LONGRANGE_AFT_TURNOVER_THRESHOLD = 2.5
+INTEGRAL_PRECISION = getattr(__config__, 'pbc_gto_cell_Cell_precision', 1e-8)
+PRECISION = getattr(__config__, 'pbc_df_aft_estimate_eta_precision', 1e-8)
+# cutoff penalty due to lattice summation
+LATTICE_SUM_PENALTY = 1e-1
 
+def make_auxmol(mol, auxbasis):
+    '''Generate a fake Mole object which uses the density fitting auxbasis as
+    the basis sets.  If auxbasis is not specified, the optimized auxiliary fitting
+    basis set will be generated according to the rules recorded in
+    pyscf.df.addons.DEFAULT_AUXBASIS.  If the optimized auxiliary basis is not
+    available (either not specified in DEFAULT_AUXBASIS or the basis set of the
+    required elements not defined in the optimized auxiliary basis),
+    even-tempered Gaussian basis set will be generated.
+
+    See also the paper JCTC, 13, 554 about generating auxiliary fitting basis.
+    '''
+    import copy
+    pmol = copy.copy(mol)  # just need shallow copy
+
+    if auxbasis is None:
+        auxbasis = addons.make_auxbasis(mol)
+    elif '+etb' in auxbasis:
+        dfbasis = auxbasis[:-4]
+        auxbasis = addons.aug_etb_for_dfbasis(mol, dfbasis)
+    pmol.basis = auxbasis
+
+    if isinstance(auxbasis, (str, list, tuple)):
+        uniq_atoms = set([a[0] for a in mol._atom])
+        _basis = dict([(a, auxbasis) for a in uniq_atoms])
+    elif 'default' in auxbasis:
+        uniq_atoms = set([a[0] for a in mol._atom])
+        _basis = dict(((a, auxbasis['default']) for a in uniq_atoms))
+        _basis.update(auxbasis)
+        del(_basis['default'])
+    else:
+        _basis = auxbasis
+    pmol._basis = pmol.format_basis(_basis)
+
+    pmol._atm, pmol._bas, pmol._env = \
+            pmol.make_env(mol._atom, pmol._basis, mol._env[:gto.PTR_ENV_START])
+    pmol._built = True
+    logger.debug(mol, 'num shells = %d, num cGTOs = %d',
+                 pmol.nbas, pmol.nao_nr())
+    return pmol
 
 def make_modrho_basis(cell, auxbasis=None, drop_eta=None):
-    auxcell = addons.make_auxmol(cell, auxbasis)
+    auxcell = make_auxmol(cell, auxbasis)
 
 # Note libcint library will multiply the norm of the integration over spheric
 # part sqrt(4pi) to the basis.
@@ -150,11 +194,19 @@ def make_modchg_basis(auxcell, smooth_eta):
 
 # kpti == kptj: s2 symmetry
 # kpti == kptj == 0 (gamma point): real
-def _make_j3c(mydf, cell, auxcell, kptij_lst, cderi_file):
+def _make_j3c(ggdf, cell, auxcell, kptij_lst, cderi_file):
+    from pyscf.pbc import df as gdf
+    GDF.weighted_coulG = gdf.GDF.weighted_coulG
+    mydf = GDF(ggdf.cell, ggdf.kpts)
     t1 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(mydf.stdout, mydf.verbose)
     max_memory = max(2000, mydf.max_memory-lib.current_memory()[0])
+    # In pyscf <= 2.0.1 mesh is initialized in constructor
+    # for newer versions mesh has to be properly initialized
+    #if mydf.mesh is None:
+    #    mydf.eta, mydf.mesh, cutoff = _guess_eta(auxcell, mydf.kpts)
     fused_cell, fuse = fuse_auxcell(mydf, auxcell)
+
 
     # The ideal way to hold the temporary integrals is to store them in the
     # cderi_file and overwrite them inplace in the second pass.  The current
@@ -196,7 +248,6 @@ def _make_j3c(mydf, cell, auxcell, kptij_lst, cderi_file):
     # cell.get_lattice_Ls) are symmetric. After adding the planewaves
     # contributions and fuse(fuse(j2c)), the output matrix is hermitian.
     j2c = fused_cell.pbc_intor('int2c2e', hermi=0, kpts=uniq_kpts)
-
     max_memory = max(2000, mydf.max_memory - lib.current_memory()[0])
     blksize = max(2048, int(max_memory*.5e6/16/fused_cell.nao_nr()))
     log.debug2('max_memory %s (MB)  blocksize %s', max_memory, blksize)
@@ -308,7 +359,6 @@ def _make_j3c(mydf, cell, auxcell, kptij_lst, cderi_file):
             for k, idx in enumerate(adapted_ji_idx):
                 v = numpy.vstack([fswap['j3c-junk/%d/%d'%(idx,i)][0,col0:col1].T
                                   for i in range(nsegs)])
-                print(f'Shape of V: {v.shape}')#, {vbar.shape}')
                 # vbar is the interaction between the background charge
                 # and the auxiliary basis.  0D, 1D, 2D do not have vbar.
                 if is_zero(kpt) and cell.dimension == 3:
@@ -450,7 +500,7 @@ class GDF(aft.AFTDF):
         else:
             ke_cutoff = tools.mesh_to_cutoff(cell.lattice_vectors(), cell.mesh)
             ke_cutoff = ke_cutoff[:cell.dimension].min()
-            eta_cell = aft.estimate_eta_for_ke_cutoff(cell, ke_cutoff, cell.precision)
+            eta_cell = estimate_eta_for_ke_cutoff(cell, ke_cutoff, cell.precision)
             eta_guess = estimate_eta(cell, cell.precision)
             logger.debug3(self, 'eta_guess = %g', eta_guess)
             if eta_cell < eta_guess:
@@ -458,8 +508,8 @@ class GDF(aft.AFTDF):
                 self.mesh = cell.mesh
             else:
                 self.eta = eta_guess
-                ke_cutoff = aft.estimate_ke_cutoff_for_eta(cell, self.eta, cell.precision)
-                self.mesh = tools.cutoff_to_mesh(cell.lattice_vectors(), ke_cutoff)
+                ke_cutoff = estimate_ke_cutoff_for_eta(cell, self.eta, cell.precision)
+                self.mesh = cutoff_to_mesh(cell.lattice_vectors(), ke_cutoff)
                 if cell.dimension < 2 or cell.low_dim_ft_type == 'inf_vacuum':
                     self.mesh[cell.dimension:] = cell.mesh[cell.dimension:]
         self.mesh = _round_off_to_odd_mesh(self.mesh)
@@ -812,6 +862,42 @@ class GDF(aft.AFTDF):
 
 DF = GDF
 
+def _cubic2nonorth_factor(a):
+    '''The factors to transform the energy cutoff from cubic lattice to
+    non-orthogonal lattice. Energy cutoff is estimated based on cubic lattice.
+    It needs to be rescaled for the non-orthogonal lattice to ensure that the
+    minimal Gv vector in the reciprocal space is larger than the required
+    energy cutoff.
+    '''
+    # Using ke_cutoff to set up a sphere, the sphere needs to be completely
+    # inside the box defined by Gv vectors
+    abase = a / numpy.linalg.norm(a, axis=1)[:,None]
+    bbase = numpy.linalg.inv(abase.T)
+    overlap = numpy.einsum('ix,ix->i', abase, bbase)
+    return 1./overlap**2
+
+def cutoff_to_mesh(a, cutoff):
+    r'''
+    Convert KE cutoff to FFT-mesh
+
+        uses KE = k^2 / 2, where k_max ~ \pi / grid_spacing
+
+    Args:
+        a : (3,3) ndarray
+            The real-space unit cell lattice vectors. Each row represents a
+            lattice vector.
+        cutoff : float
+            KE energy cutoff in a.u.
+
+    Returns:
+        mesh : (3,) array
+    '''
+    b = 2 * numpy.pi * numpy.linalg.inv(a.T)
+    cutoff = cutoff * _cubic2nonorth_factor(a)
+    mesh = numpy.ceil(numpy.sqrt(2*cutoff)/lib.norm(b, axis=1) * 2).astype(int)
+    return mesh
+
+"""
 def estimate_eta_for_ke_cutoff(cell, ke_cutoff, precision=None):
     '''Given ke_cutoff, the upper bound of eta to produce the required
     precision in AFTDF Coulomb integrals.
@@ -832,8 +918,27 @@ def estimate_eta_for_ke_cutoff(cell, ke_cutoff, precision=None):
     else:
         eta = min(4., eta)
     return eta
+"""
+def estimate_eta_for_ke_cutoff(cell, ke_cutoff, precision=PRECISION):
+    '''Given ke_cutoff, the upper bound of eta to produce the required
+    precision in AFTDF Coulomb integrals.
+    '''
+    # search eta for interaction between GTO(eta) and point charge at the same
+    # location so that
+    # \sum_{k^2/2 > ke_cutoff} weight*4*pi/k^2 GTO(eta, k) < precision
+    # GTO(eta, k) = Fourier transform of Gaussian e^{-eta r^2}
 
+    lmax = numpy.max(cell._bas[:,gto.ANG_OF])
+    kmax = (ke_cutoff*2)**.5
+    # The interaction between two s-type density distributions should be
+    # enough for the error estimation.  Put lmax here to increate Ecut for
+    # slightly better accuracy
+    log_rest = numpy.log(precision / (32*numpy.pi**2 * kmax**(lmax-1)))
+    log_eta = -1
+    eta = kmax**2/4 / (-log_eta - log_rest)
+    return eta
 
+"""
 def estimate_ke_cutoff_for_eta(cell, eta, precision=None):
     '''Given eta, the lower bound of ke_cutoff to produce the required
     precision in AFTDF Coulomb integrals.
@@ -853,7 +958,40 @@ def estimate_ke_cutoff_for_eta(cell, eta, precision=None):
     Ecut = numpy.log(fac * (Ecut*2)**(-.5)) * 2*theta
     Ecut = numpy.log(fac * (Ecut*2)**(-.5)) * 2*theta
     return Ecut
+"""
+def estimate_ke_cutoff_for_eta(cell, eta, precision=PRECISION):
+    '''Given eta, the lower bound of ke_cutoff to produce the required
+    precision in AFTDF Coulomb integrals.
+    '''
+    # estimate ke_cutoff for interaction between GTO(eta) and point charge at
+    # the same location so that
+    # \sum_{k^2/2 > ke_cutoff} weight*4*pi/k^2 GTO(eta, k) < precision
+    # \sum_{k^2/2 > ke_cutoff} weight*4*pi/k^2 GTO(eta, k)
+    # ~ \int_kmax^infty 4*pi/k^2 GTO(eta,k) dk^3
+    # = (4*pi)^2 *2*eta/kmax^{n-1} e^{-kmax^2/4eta} + ... < precision
 
+    # The magic number 0.2 comes from AFTDF.__init__ and GDF.__init__
+    eta = max(eta, 0.2)
+    log_k0 = 3 + numpy.log(eta) / 2
+    log_rest = numpy.log(precision / (32*numpy.pi**2*eta))
+    # The interaction between two s-type density distributions should be
+    # enough for the error estimation.  Put lmax here to increate Ecut for
+    # slightly better accuracy
+    lmax = numpy.max(cell._bas[:,gto.ANG_OF])
+    Ecut = 2*eta * (log_k0*(lmax-1) - log_rest)
+    Ecut = max(Ecut, .5)
+    return Ecut
+
+def estimate_eta(cell, cutoff=CUTOFF):
+    '''The exponent of the smooth gaussian model density, requiring that at
+    boundary, density ~ 4pi rmax^2 exp(-eta/2*rmax^2) ~ 1e-12
+    '''
+    lmax = min(numpy.max(cell._bas[:,gto.ANG_OF]), 4)
+    # If lmax=3 (r^5 for radial part), this expression guarantees at least up
+    # to f shell the convergence at boundary
+    eta = max(numpy.log(4*numpy.pi*cell.rcut**(lmax+2)/cutoff)/cell.rcut**2*2,
+              ETA_MIN)
+    return eta
 
 def _guess_eta(cell, kpts=None, mesh=None):
     '''Search for optimal eta and mesh'''
@@ -961,8 +1099,8 @@ def auxbar(fused_cell):
 
 def fuse_auxcell(mydf, auxcell):
     eta = mydf.eta
-    if eta is None:
-        eta, mesh, ke_cutoff = _guess_eta(auxcell, mydf.kpts, mydf.mesh)   
+    #if eta is None:
+    #    eta, mesh, ke_cutoff = _guess_eta(auxcell, mydf.kpts, mydf.mesh)   
     chgcell = make_modchg_basis(auxcell, eta)
     fused_cell = copy.copy(auxcell)
     fused_cell._atm, fused_cell._bas, fused_cell._env = \
@@ -1150,3 +1288,13 @@ def _round_off_to_odd_mesh(mesh):
     # problem can be found in function _make_j3c.
     return [(i//2)*2+1 for i in mesh]
 
+def _estimate_rcut(alpha, l, c, precision=INTEGRAL_PRECISION):
+    '''rcut based on the overlap integrals. This estimation is too conservative
+    in many cases. A possible replacement can be the value of the basis
+    function at rcut ~ c*r^(l+2)*exp(-alpha*r^2) < precision'''
+    C = (c**2)*(2*l+1) / (precision * LATTICE_SUM_PENALTY)
+    r0 = 20
+    # +1. to ensure np.log returning positive value
+    r0 = numpy.sqrt(2.*numpy.log(C*(r0**2*alpha)**(l+1)+1.) / alpha)
+    rcut = numpy.sqrt(2.*numpy.log(C*(r0**2*alpha)**(l+1)+1.) / alpha)
+    return rcut
