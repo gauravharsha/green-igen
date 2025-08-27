@@ -52,9 +52,7 @@ from pyscf.pbc.df import df_jk
 from pyscf.pbc.df import df_ao2mo
 from pyscf.pbc.df.aft import get_nuc
 from pyscf.pbc.df.df_jk import zdotCN
-from pyscf.pbc.lib.kpts_helper import (is_zero, gamma_point, member, unique, unique_with_wrap_around,
-                                       KPT_DIFF_TOL)
-from pyscf.pbc.df.aft import _sub_df_jk_
+from pyscf.pbc.lib.kpts_helper import (is_zero, gamma_point, member, unique, KPT_DIFF_TOL)
 from pyscf import __config__
 
 LINEAR_DEP_THR = getattr(__config__, 'pbc_df_df_DF_lindep', 1e-9)
@@ -65,6 +63,19 @@ INTEGRAL_PRECISION = getattr(__config__, 'pbc_gto_cell_Cell_precision', 1e-8)
 PRECISION = getattr(__config__, 'pbc_df_aft_estimate_eta_precision', 1e-8)
 # cutoff penalty due to lattice summation
 LATTICE_SUM_PENALTY = 1e-1
+
+
+def unique_with_wrap_around(cell, kpts):
+    '''Search unique kpts in first Brillouin zone.'''
+    scaled_kpts = cell.get_scaled_kpts(kpts).round(5)
+    scaled_kpts = numpy.modf(scaled_kpts)[0]
+    scaled_kpts[scaled_kpts >= .5] -= 1
+    scaled_kpts[scaled_kpts < -.5] += 1
+
+    uniq_index, uniq_inverse = unique(scaled_kpts)[1:3]
+    uniq_kpts = kpts[uniq_index]
+    return uniq_kpts, uniq_index, uniq_inverse
+
 
 def make_auxmol(mol, auxbasis):
     '''Generate a fake Mole object which uses the density fitting auxbasis as
