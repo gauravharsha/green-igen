@@ -32,8 +32,8 @@ jobs:
         sudo apt install libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev liblapack-dev libblas-dev
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
-        pip install git+${{ matrix.pyscf-version }}
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install git+${{ matrix.pyscf-version }}
     - name: Install package
       run: |
         pip install .
