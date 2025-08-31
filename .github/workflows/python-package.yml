@@ -35,8 +35,8 @@ jobs:
         python -m pip install flake8 pytest 
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install --upgrade-strategy only-if-needed ${{ matrix.pyscf-version }}
-        if [ ${{ matrix.pyscf-version }} = "git+https://github.com/cnyeh/pyscf.git@x2c1e_kpoints" ] then
-          pip install --upgrade scipy<1.11.0
+        if [ ${{ matrix.pyscf-version }} = "git+https://github.com/cnyeh/pyscf.git@x2c1e_kpoints" ]; then
+          pip install --upgrade scipy<1.11.0;
         fi
     - name: Install package
       run: |
