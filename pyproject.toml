@@ -15,7 +15,7 @@ authors = [
   { name="Gaurav Harsha" },
 ]
 
-dependencies = ["numpy", "h5py", "scipy>=1.10,<1.11.0", "pyscf"]
+dependencies = ["numpy", "h5py", "scipy", "pyscf"]
 
 description = "Analytical continuation suits for Green Software Package"
 readme = "README.md"
