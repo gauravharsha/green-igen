@@ -18,8 +18,8 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11"]
         pyscf-version:
-          - "https://github.com/cnyeh/pyscf.git@x2c1e_kpoints"
-          - "https://github.com/pyscf/pyscf.git"
+          - "git+https://github.com/cnyeh/pyscf.git@x2c1e_kpoints"
+          - "pyscf==2.7.0"
 
     steps:
     - uses: actions/checkout@v4
@@ -30,14 +30,14 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt install libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev liblapack-dev libblas-dev
-        sudo apt-get install build-essential
+        sudo apt install build-essential
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest 
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install git+${{ matrix.pyscf-version }}
+        pip install ${{ matrix.pyscf-version }}
     - name: Install package
       run: |
-        pip install .
+        python -m pip install .
     - name: Install Green-MBTools
       run: |
         pip install green-mbtools
@@ -50,5 +50,6 @@ jobs:
     - name: Test Green-MBTools with pytest
       run: |
         git clone https://github.com/green-phys/green-mbtools
+        python -c "import scipy; print(scipy.__version__)"
         cd green-mbtools/tests
         pytest -v
