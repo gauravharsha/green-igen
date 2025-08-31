@@ -12,9 +12,10 @@ name = "green-igen"
 version = "0.2.7"
 authors = [
   { name="Sergei Iskakov", email="siskakov@umich.edu" },
+  { name="Gaurav Harsha" },
 ]
 
-dependencies = ["numpy", "h5py", "scipy", "pyscf"]
+dependencies = ["numpy", "h5py", "scipy<1.11.0", "pyscf"]
 
 description = "Analytical continuation suits for Green Software Package"
 readme = "README.md"
