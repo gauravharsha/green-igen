@@ -50,6 +50,6 @@ jobs:
     - name: Test Green-MBTools with pytest
       run: |
         git clone https://github.com/green-phys/green-mbtools
-        python -c "import scipy; print("Scipy version: ", scipy.__version__)"
+        python -c "import scipy; print('Scipy version: ', scipy.__version__)"
         cd green-mbtools/tests
         pytest -v
