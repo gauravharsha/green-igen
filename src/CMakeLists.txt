@@ -36,4 +36,4 @@ set_target_properties(pbc0 PROPERTIES
   COMPILE_FLAGS ${OpenMP_C_FLAGS}
   LINK_FLAGS ${OpenMP_C_FLAGS})
 
-target_link_libraries(pbc0 ${BLAS_LIBRARIES})
+target_link_libraries(pbc0 ${BLAS_LIBRARIES} m)
