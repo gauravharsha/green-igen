@@ -32,8 +32,7 @@ jobs:
         sudo apt install libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev liblapack-dev libblas-dev libhdf5-dev
         sudo apt install build-essential
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest 
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        python -m pip install flake8 pytest numpy h5py
         pip install --upgrade-strategy only-if-needed ${{ matrix.pyscf-version }}
         if [ ${{ matrix.pyscf-version }} = "git+https://github.com/cnyeh/pyscf.git@x2c1e_kpoints" ]; then
           pip install --upgrade "scipy<1.11.0";
@@ -44,11 +43,11 @@ jobs:
         python -m pip install --upgrade-strategy only-if-needed .
     - name: Install Green-MBTools and Test igen
       run: |
-        git clone https://github.com/green-phys/green-mbtools
-        cd green-mbtools
-        pip install --upgrade-strategy only-if-needed .
+        pip install --upgrade-strategy only-if-needed green-mbtools
         python -c "import scipy; print('Scipy version: ', scipy.__version__)"
-        cd tests
+        cd ../
+        git clone https://github.com/green-phys/green-mbtools
+        cd green-mbtools/tests
         pytest -v
     # - name: Lint with flake8
     #   run: |
