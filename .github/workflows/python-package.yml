@@ -29,8 +29,15 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        sudo apt update
         sudo apt install python3-distutils libblas-dev liblapack-dev libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev libhdf5-dev
         sudo apt install build-essential
+        # The following handles distutils for multiple Python versions
+        PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        if ! python3 -c "import distutils" 2>/dev/null; then
+          sudo apt install -y python${PY_VER}-distutils || true
+        fi
+        python -m pip install --upgrade pip setuptools
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest numpy h5py
         pip install --upgrade-strategy only-if-needed ${{ matrix.pyscf-version }}
