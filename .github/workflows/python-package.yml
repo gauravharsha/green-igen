@@ -29,7 +29,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        sudo apt install libblas-dev liblapack-dev libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev libhdf5-dev
+        sudo apt install python3-distutils libblas-dev liblapack-dev libeigen3-dev libgmp-dev libmpfr-dev libfftw3-dev libhdf5-dev
         sudo apt install build-essential
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest numpy h5py
