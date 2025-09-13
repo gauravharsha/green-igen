@@ -107,6 +107,9 @@ set(MIN_EXPCUTOFF ${libcint_MIN_EXPCUTOFF})
 set(KEEP_GOING ${libcint_KEEP_GOING})
 set(CMAKE_C_CREATE_SHARED_LIBRARY ${libcint_CMAKE_C_CREATE_SHARED_LIBRARY})
 
+check_library_exists(quadmath logq "" HAVE_LIBQUADMATH)
+check_include_file("quadmath.h" HAVE_QUADMATH_H)
+
 add_subdirectory(src)
 add_library(GREEN::IGEN ALIAS pbc0)
 add_dependencies(pbc0 cint)
