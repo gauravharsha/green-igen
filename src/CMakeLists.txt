@@ -38,6 +38,6 @@ set_target_properties(pbc0 PROPERTIES
 
 target_link_libraries(pbc0 ${BLAS_LIBRARIES} m)
 if (HAVE_LIBQUADMATH AND HAVE_QUADMATH_H)
-    target_link_libraries(pbc0 quadmath)
-    target_compile_definitions(pbc0 USE_LIBQUADMATH)
+    target_link_libraries(pbc0 PUBLIC quadmath)
+    target_compile_definitions(pbc0 PUBLIC USE_LIBQUADMATH)
 endif()
