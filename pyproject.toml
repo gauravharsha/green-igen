@@ -11,8 +11,8 @@ cmake.verbose = true
 name = "green-igen"
 version = "0.2.7"
 authors = [
-  { name="Sergei Iskakov"},
-  { name="Gaurav Harsha", email="siskakov@umich.edu"},
+  { name="Sergei Iskakov" },
+  { name="Gaurav Harsha", email="siskakov@umich.edu" },
 ]
 
 dependencies = ["numpy", "h5py", "scipy", "pyscf"]
