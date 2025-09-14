@@ -36,7 +36,7 @@ set_target_properties(pbc0 PROPERTIES
   COMPILE_FLAGS ${OpenMP_C_FLAGS}
   LINK_FLAGS ${OpenMP_C_FLAGS})
 
-target_link_libraries(pbc0 ${BLAS_LIBRARIES} m)
+target_link_libraries(pbc0 PUBLIC ${BLAS_LIBRARIES} m)
 if (HAVE_LIBQUADMATH AND HAVE_QUADMATH_H)
     target_link_libraries(pbc0 PUBLIC quadmath)
     target_compile_definitions(pbc0 PUBLIC USE_LIBQUADMATH)
