@@ -9,9 +9,10 @@ cmake.verbose = true
 
 [project]
 name = "green-igen"
-version = "0.2.6"
+version = "0.2.7"
 authors = [
   { name="Sergei Iskakov", email="siskakov@umich.edu" },
+  { name="Gaurav Harsha" },
 ]
 
 dependencies = ["numpy", "h5py", "scipy", "pyscf"]
